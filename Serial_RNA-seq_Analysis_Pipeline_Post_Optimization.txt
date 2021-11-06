@@ -1,0 +1,47 @@
+#################################################################################################################
+## RNA-seq Analysis Pipeline (Post Optimizations) - José Mayorga
+#################################################################################################################
+
+# Ensure the chromosome names match in the reference fasta and the gtf file.
+
+#### Trimming Adapters ####
+
+cutadapt -j <num_cores> -a <adapter_sequence> -m <minimum_seq_len> <File_in>
+
+#### Performing QC on the Trimmed Sequencing Files ####
+
+fastqc -o <output_directory> -t <num_parallel_analysis> <Files_in>
+
+# Can combine reports with multiQC
+
+multiqc <output_directory>
+
+#### Generating STAR Alignment Index ####
+
+STAR --runThreadN <num_threads> --runMode genomeGenerate --genomeDir <Directory_Name> --genomeFastaFiles <reference_fasta> --sjdbGTFfile <gtf_file>
+
+#### Alignment with STAR ####
+
+STAR --runThreadN <num_threads> --genomeDir <Directory_Name> --outFileNamePrefix <out_file_name> --readFilesIn <input_file(s)>
+
+#### Sorting and Converting by name ####
+
+samtools sort -@ <num_threads> -n {} -o output_file.bam
+
+#### Applying HT-seq to Quantify Transcripts ####
+
+# htseq-count: input name sorted bam file,
+# "-i gene_id" count reads for each gene; the feature of "gene_id" could be contained in the .gtf file
+# "gene_id" can be changed to others like "transcript_id"
+
+# python -m HTSeq.scripts.count [options] <alignment_files> <gff_file>
+# -f - format of input file (sam by default)
+# -r - the order of the reads (name [default] or position [default of samtools])
+# -s - stranded rna-seq (yes, no, reverse)
+# -t - feature type (3rd column in GFF to file), default is exon 
+# -i - GFF attribute to be used as feature ID, default is gene_id
+# -m - Mode to handle reads overlapping more than one feature
+
+# HT-seq needs to be run for every sample individually
+
+htseq-count -f bam -s no -m intersection-nonempty <input_file> <gtf_file> > output_file.count
