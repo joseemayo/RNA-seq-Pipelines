@@ -1,0 +1,64 @@
+#################################################################################################################
+## RNA-seq Analysis Pipeline (Prior to Optimizations) - José Mayorga
+#################################################################################################################
+
+# Ensure the chromosome names match in the reference fasta and the gtf file.
+
+#### Creating splice site and exon files ####
+
+python hisat2-2.1.0/hisat2_extract_splice_sites.py <gtf_file> > splice_sites.ss
+
+python hisat2-2.1.0/hisat2_extract_exons.py <gtf_file> > exon_information.exon
+
+#### Building hisat index ####
+
+hisat2-build -p <threads> --ss splice_sites.ss --exon exon_information.exon <refernce_fasta> <hisat2_index_name>
+
+hisat2-inspect <hisat2_index_name> -s
+
+#### Trimming Adapters ####
+
+cutadapt -j <num_cores> -a <adapter_sequence> -m <minimum_seq_len> <File_in>
+
+#### Performing QC on the Trimmed Sequencing Files ####
+
+fastqc -o <output_directory> -t <num_parallel_analysis> <Files_in>
+
+# Can combine reports with multiQC
+
+multiqc <output_directory>
+
+#### Performing Aligment ####
+
+# Denote the location of the index to simplify the alignment command
+
+export HISAT2_INDEXES=<Directory of index>
+
+# --dta/--downstream-transcriptome-assembly - Report alignments tailored for transcript assemblers including StringTie. With this option, HISAT2 requires longer anchor lengths for de novo discovery of splice sites. 
+# This leads to fewer alignments with short-anchors, which helps transcript assemblers improve significantly in computation and memory usage.
+# --no-discordant - Does not allow for discordant alignment
+# --no-mixed - By default, when hisat2 cannot find a concordant or discordant alignment for a pair, it then tries to find alignments for the individual mates. This option disables that behavior.
+
+hisat2 -p <threads> --no-discordant --no-mixed --dta -x hisat2_index -1 <file_1.fastq> -2 <file_2.fastq> -S <output.sam>
+
+#### Sorting and Converting by name ####
+
+samtools sort -@ <num_threads> -n {} -o output_file.bam
+
+#### Applying HT-seq to Quantify Transcripts ####
+
+# htseq-count: input name sorted bam file,
+# "-i gene_id" count reads for each gene; the feature of "gene_id" could be contained in the .gtf file
+# "gene_id" can be changed to others like "transcript_id"
+
+# python -m HTSeq.scripts.count [options] <alignment_files> <gff_file>
+# -f - format of input file (sam by default)
+# -r - the order of the reads (name [default] or position [default of samtools])
+# -s - stranded rna-seq (yes, no, reverse)
+# -t - feature type (3rd column in GFF to file), default is exon 
+# -i - GFF attribute to be used as feature ID, default is gene_id
+# -m - Mode to handle reads overlapping more than one feature
+
+# HT-seq needs to be run for every sample individually
+
+htseq-count -f bam -s no -m intersection-nonempty <input_file> <gtf_file> > output_file.count
