@@ -1,0 +1,58 @@
+#################################################################################################################
+## RNA-seq Analysis Pipeline (Prior to Optimizations) - José Mayorga
+#################################################################################################################
+
+# Ensure the chromosome names match in the reference fasta and the gtf file.
+
+#### Creating splice site and exon files ####
+
+python hisat2-2.1.0/hisat2_extract_splice_sites.py <gtf_file> > splice_sites.ss
+
+python hisat2-2.1.0/hisat2_extract_exons.py <gtf_file> > exon_information.exon
+
+#### Building hisat index ####
+
+hisat2-build -p <threads> --ss splice_sites.ss --exon exon_information.exon <refernce_fasta> <hisat2_index_name>
+
+hisat2-inspect <hisat2_index_name> -s
+
+#### Trimming Adapters ####
+
+cutadapt -j <num_cores> -a <adapter_sequence> -m <minimum_seq_len> <File_in>
+
+#### Performing QC on the Trimmed Sequencing Files ####
+
+fastqc -o <output_directory> -t <num_parallel_analysis> <Files_in>
+
+# Can combine reports with multiQC
+
+multiqc <output_directory>
+
+#### Performing Aligment ####
+
+# Denote the location of the index to simplify the alignment command
+
+export HISAT2_INDEXES=<Directory of index>
+
+# --dta/--downstream-transcriptome-assembly - Report alignments tailored for transcript assemblers including StringTie. With this option, HISAT2 requires longer anchor lengths for de novo discovery of splice sites. 
+# This leads to fewer alignments with short-anchors, which helps transcript assemblers improve significantly in computation and memory usage.
+# --no-discordant - Does not allow for discordant alignment
+# --no-mixed - By default, when hisat2 cannot find a concordant or discordant alignment for a pair, it then tries to find alignments for the individual mates. This option disables that behavior.
+
+hisat2 -p <threads> --no-discordant --no-mixed --dta -x hisat2_index -1 <file_1.fastq> -2 <file_2.fastq> -S <output.sam>
+
+#### Sorting and Converting Output Files ####
+
+samtools sort -@ <num_threads [Found that the max is equal to the number of cores]> <sam_in> -o <bam_out>
+
+#### Applying StringTie2 algorithm #### 
+
+# -e - Limits the processing of read alignments to only estimate and output the assembled transcripts matching the reference transcripts given with the -G option (requires -G, recommended for -B/-b).
+# -B - This switch enables the output of Ballgown input table files (*.ctab) containing coverage data for the reference transcripts given with the -G option.
+# -G - Use the reference annotation file (in GTF or GFF3 format) to guide the assembly process.
+
+stringtie -e -B -p <threads> -G <gtf_file> -o <output_files> <input_file>
+
+#### Obtaining a Raw Counts Matrix from StringTie2 ####
+
+python prepDE.py -i gtf_file_locations.txt
