@@ -12,6 +12,8 @@ Later optimizations were introduced through the referencing of a paper performin
 
 Files:
 
+Serial_RNA-seq_Analysis_Pipeline_Prior_to_Optimization.txt
+- Original RNA-seq Analysis Pipeline
+
 Serial_RNA-seq_Analysis_Pipeline_Post_Optimization.txt
-
-
+- Optimized RNA-seq Analysis Pipeline
