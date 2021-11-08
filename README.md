@@ -10,3 +10,8 @@ The principal pipeline was adapted from the following nature protocol article: h
 Later optimizations were introduced through the referencing of a paper performing a comparison of commonly used RNA-seq tools: https://www.nature.com/articles/s41598-020-76881-x
 - Final optimizations included swapping STAR for hisat2 for alignment, having little to no noticable differnce, and using HT-seq to quantify reads in place of StringTie.
 
+Files:
+
+Serial_RNA-seq_Analysis_Pipeline_Post_Optimization.txt
+
+
